@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>POS System</title>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert/dist/sweetalert.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <div class="flex gap-4 p-4">
+    
+    <!-- Product List -->
+    <div class="w-7/12 bg-white rounded-xl shadow-lg p-4">
+      <h2 class="text-xl font-bold mb-4 text-gray-700">Products</h2>
+      <div class="grid grid-cols-4 gap-4" id="main_product_card">
+        <!-- product cards will render here -->
+      </div>
+    </div>
+
+    <!-- POS Panel -->
+    <div class="w-5/12 bg-white rounded-xl shadow-lg flex flex-col">
+      <h2 class="text-2xl font-bold text-gray-700 p-4 border-b">🛒 Order Summary</h2>
+
+      <!-- Product Table -->
+      <div class="flex-1 overflow-y-auto">
+        <table class="w-full text-sm text-left">
+          <thead class="bg-gradient-to-r from-blue-500 to-blue-600 text-white sticky top-0">
+            <tr>
+              <th class="p-2">No.</th>
+              <th class="p-2">Name</th>
+              <th class="p-2">Price</th>
+              <th class="p-2">Qty</th>
+              <th class="p-2">Total</th>
+              <th class="p-2">Action</th>
+            </tr>
+          </thead>
+          <tbody id="selected_tr" class="divide-y">
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Totals -->
+      <div class="p-4 border-t space-y-3">
+        <div class="flex justify-between text-lg">
+          <span>Total (USD):</span>
+          <span id="total_usd" class="font-bold text-blue-600">0.00$</span>
+        </div>
+        <div class="flex justify-between text-lg">
+          <span>Total (KHR):</span>
+          <span id="total_khr" class="font-bold text-green-600">0៛</span>
+        </div>
+      </div>
+
+      <!-- Received -->
+      <div class="p-4 border-t flex justify-between items-center">
+        <label for="received" class="text-lg">Received:</label>
+        <input type="number" id="received" onkeyup="getChangeAmount()" class="w-40 p-2 text-xl border rounded-lg focus:ring-2 focus:ring-blue-400">
+      </div>
+
+      <!-- Change -->
+      <div class="p-4 border-t flex justify-between items-center">
+        <span class="text-xl font-semibold">Change:</span>
+        <span id="changed_amount" class="text-2xl font-bold bg-yellow-400 text-gray-800 px-4 py-2 rounded-lg w-40 text-center"></span>
+      </div>
+
+      <!-- Buttons -->
+      <div class="p-4 border-t flex justify-between">
+        <button onclick="cancelProduct()" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg shadow">Cancel</button>
+        <button id="btn_pay" class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg shadow">Pay</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // Data Sample
+  let product_array = JSON.parse(localStorage.getItem('product_array') ?? '[]')
+  if(product_array.length === 0){
+    product_array = [
+      {name:"Coca Cola", price:1, profile:"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT3M-xR4PTf-oldWP8s2UWBCDxtZatNqXs1NA&s"},
+      {name:"Pepsi", price:1, profile:"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTCQg22CSam1a8aJvBhGFPEYIFTEHknOvWgRw&s"},
+      {name:"Sprite", price:1, profile:"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSPb8ZgVYExJPTxUe8B1q8RW7glLp9vzY09QQ&s"},
+      {name:"Fanta", price:1.2, profile:"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ2fo0lYRbdSGCbqVJ4x11R8JXGQ85VJDjSUA&s"}
+    ]
+  }
+
+  let main_product_card = document.getElementById('main_product_card')
+  let selected_tr = document.getElementById('selected_tr')
+  let input_received = document.getElementById('received')
+  let btn_pay = document.getElementById('btn_pay')
+  let selected_product = []
+  let total = 0
+
+  renderProductCard()
+
+  function renderProductCard(){
+    let html_card = ''
+    product_array.forEach((product, index) =>{
+      html_card += `
+        <div class="bg-white border rounded-lg shadow hover:shadow-md cursor-pointer p-2" onclick="cardOnClick(${index})">
+          <div class="h-32 flex items-center justify-center">
+            <img class="max-h-full object-contain" src="${product.profile}" alt="${product.name}" />
+          </div>
+          <div class="text-center mt-2">
+            <h5 class="text-sm font-semibold text-gray-900">${product.name}</h5>
+            <p class="text-gray-700 text-xs">${product.price}$</p>
+          </div>
+        </div>
+      `
+    })
+    main_product_card.innerHTML = html_card
+  }
+
+  function cardOnClick(index){
+    let current_product = {...product_array[index]}
+    let dpl_index = selected_product.findIndex(p => p.name === current_product.name)
+    if(dpl_index !== -1){
+      selected_product[dpl_index].quantity += 1
+    } else {
+      current_product.quantity = 1
+      selected_product.push(current_product)
+    }
+    renderSeletecProduct()
+    Total()
+  }
+
+  function deleteItem(index){
+    swal({
+      title: "Do you want to delete?",
+      text: "Once deleted, you will not be able to recover your data!",
+      icon: "warning",
+      buttons: true,
+      dangerMode: true,
+    }).then((willDelete) => {
+      if (willDelete) {
+        selected_product.splice(index, 1)
+        renderSeletecProduct()
+        Total()
+        swal("Item deleted!", {icon: "success"})
+      }
+    });
+  }
+
+  function renderSeletecProduct(){
+    let selected_product_tr = ''
+    selected_product.forEach((product, index) =>{
+      let total_product = product.price * product.quantity
+      selected_product_tr += `
+         <tr class="[&>td]:p-2">
+              <td>${index+1}.</td>
+              <td>${product.name}</td>
+              <td>${product.price}$</td>
+              <td>${product.quantity}</td>
+              <td>${total_product.toFixed(2)}$</td>
+              <td>
+                <button onclick="deleteItem(${index})" class="bg-red-500 hover:bg-red-600 text-white rounded px-2 py-1">🗑️</button>
+              </td>
+          </tr>
+      `
+    })
+    selected_tr.innerHTML = selected_product_tr
+  }
+
+  function Total(){
+    total = 0
+    selected_product.forEach((product) =>{
+      total += product.price * product.quantity
+    })
+    document.getElementById('total_usd').innerText = total.toFixed(2) +"$"
+    document.getElementById('total_khr').innerText = (total*4000).toLocaleString() +"៛"
+  }
+
+  btn_pay.addEventListener('click', function(){
+    let received = parseFloat(input_received.value)
+    if (received >= total){
+      localStorage.setItem('selected_product', JSON.stringify(selected_product))
+      let width = 600, height = 600
+      let left = (window.screen.width - width) / 2;
+      let top = (window.screen.height - height) / 2;
+      window.open(
+        'invoice.html',
+        '_blank',
+        `width=600,height=600,left=${left},top=${top}`
+      )
+    } else {
+      swal("Payment Error", "Received amount is less than total!", "error")
+    }
+  })
+
+  function getChangeAmount(){
+    let received = input_received.value
+    let label_change_amount = document.getElementById('changed_amount')
+    if(received.trim()===""){
+      label_change_amount.innerText = ""
+      return
+    }
+    let changed_amount = parseFloat(received) - parseFloat(total)
+    label_change_amount.innerText = changed_amount.toFixed(2) + "$"
+  }
+
+  function cancelProduct(){
+    swal({
+      title: "Do you want to cancel?",
+      text: "This will clear all products!",
+      icon: "warning",
+      buttons: true,
+      dangerMode: true,
+    }).then((willDelete) => {
+      if (willDelete) {
+        total = 0
+        selected_product = []
+        renderSeletecProduct()
+        Total()
+        input_received.value = ""
+        document.getElementById('changed_amount').innerText = ""
+        swal("Order cleared!", {icon:"success"})
+      }
+    });
+  }
+</script>
+</body>
+</html>
